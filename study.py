@@ -61,13 +61,10 @@ def find_lines_changed(commit):
                 assert plus_filename == minus_filename
 
         elif l.startswith(DELIM):
-            minus = l.find("-")
             plus = l.find("+")
             end_delim = l.find(DELIM, len(DELIM))
 
-            lines_removed = l[minus+len("-"):plus].strip()
             lines_added = l[plus+len("+"):end_delim].strip()
-            print(lines_removed)
             print(lines_added)
 
             # We only care about lines added (something like 315 or 315,5)
@@ -81,6 +78,9 @@ def find_lines_changed(commit):
 
     results[plus_filename] = line_ranges
     print(results)
+
+
+
 if __name__ == "__main__":
     info = linux_info
 
