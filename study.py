@@ -10,7 +10,7 @@ test_info = {
     "path": "test-repo"
 }
 
-MIN_DATE = "October 1 2015"
+MIN_DATE = "October 1 2016"
 
 def run_command(args):
     proc = subprocess.Popen(args,
@@ -119,7 +119,7 @@ def main():
     recent_commits = get_recent_non_merge_commits()
 
     # TODO: undo
-    recent_commits = recent_commits[:25]
+    #recent_commits = recent_commits[:25]
 
     # Ignore first commit
     recent_commits = recent_commits[:-1]
