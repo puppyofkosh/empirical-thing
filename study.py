@@ -1,38 +1,10 @@
 import os
-import subprocess
+from command_helper import run_command, find_bugfixes, linux_info, test_info
 
-linux_info = {
-#    "path": "/home/puppyofkosh/safer-c-compiler",
-    "path": "/home/puppyofkosh/linux",
-}
-
-test_info = {
-    "path": "test-repo"
-}
 
 MIN_DATE = "October 1 2016"
 
-def run_command(args):
-    proc = subprocess.Popen(args,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            shell=True)
-    stdout, stderr = proc.communicate()
-    if len(stderr) > 0:
-        print(stderr)
-        raise RuntimeError("Wrote to stderr !?")
-    return stdout
 
-
-#TODO update regex to be [bug|fix]
-# Return hashes for commits with the word bug in them in most recent -> least recent order
-def find_bugfixes():
-    args = ["git log --grep 'bug' --since='{0}' --pretty=oneline --no-color --no-merges".format(MIN_DATE)]
-    stdout = run_command(args)
-    lines = stdout.decode("utf-8").split("\n")
-
-    hashes = [l.split(" ")[0] for l in lines if len(l) > 0]
-    return hashes
 
 def get_recent_non_merge_commits():
     args = ["git log  --pretty=oneline --no-color --since='{0}' --no-merges".format(MIN_DATE)]
@@ -114,12 +86,9 @@ def main():
     info = linux_info
     os.chdir(info["path"])
 
-    bug_fixes = set(find_bugfixes())
+    bug_fixes = set(find_bugfixes(MIN_DATE))
 
     recent_commits = get_recent_non_merge_commits()
-
-    # TODO: undo
-    #recent_commits = recent_commits[:25]
 
     # Ignore first commit
     recent_commits = recent_commits[:-1]
@@ -139,7 +108,6 @@ def main():
                     print("OVERLAP FOUND")
                     overlaps.append((c, fname, start_line, end_line, bug_fixes & commits))
 
-    #find_lines_changed("HEAD")
     print("Overlaps are {0}".format(overlaps))
     
 
