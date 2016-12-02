@@ -23,6 +23,13 @@ def find_broken_fixes(fix_map):
 
     return buggy_fixes
 
+def count_buggy_fixes(buggy_fixes):
+    # Map is of form: commit -> commits which fixed it
+    # If commit X has 3 fixes: A, B, and C, then we have 3 buggy
+    # fixes: X, A, and B
+    count = sum(len(buggy_fixes[b]) for b in buggy_fixes)
+    return count
+
 def main():
     info = linux_info
     os.chdir(info["path"])
@@ -31,11 +38,12 @@ def main():
     buggy_fixes = find_broken_fixes(fix_map)
 
     print(buggy_fixes)
-    
+
     prop = len(buggy_fixes) * 1.0 / len(fix_map)
     print("Number of fixes: {0}".format(len(fix_map)))
     print("Number of buggy fixes: {0}".format(len(buggy_fixes)))
+    print("Number of buggy fixes if you count double-fixes: {0}".format(count_buggy_fixes(buggy_fixes)))
     print("Proportion of fixes which themselves had to be fixed: {0}".format(prop))
-    
+
 if __name__ == "__main__":
     main()

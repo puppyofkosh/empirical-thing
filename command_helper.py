@@ -11,17 +11,21 @@ test_info = {
     "path": "test-repo"
 }
 
-def run_command(args):
+
+def try_run_command(args):
     proc = subprocess.Popen(args,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             shell=True)
     stdout, stderr = proc.communicate()
+    return stdout, stderr
+
+def run_command(args):
+    stdout, stderr = try_run_command(args)
     if len(stderr) > 0:
         print(stderr)
         raise RuntimeError("Wrote to stderr !?")
     return stdout
-
 
 #TODO update regex to be [bug|fix]
 # Return hashes for commits with the word bug in them in most recent -> least recent order
@@ -56,3 +60,10 @@ def find_commits_with_fix_tags(min_date):
             fix_map[current_commit].add(buggy_commit)
 
     return fix_map
+
+def find_commits_with_fix_words(min_date):
+    args = [r"git log --grep='Reported-and-tested\|Fixes:\|Fix' --pretty=oneline --format='%H' --since='{0}'".format(min_date)]
+    stdout = run_command(args)
+    lines = stdout.decode("utf-8").split("\n")
+
+    return [l.strip() for l in lines if len(l) > 0]
