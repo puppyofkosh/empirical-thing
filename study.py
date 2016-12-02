@@ -1,10 +1,13 @@
+import pprint
 import os
-from command_helper import run_command, find_bugfixes, linux_info, test_info
+from collections import defaultdict
+from command_helper import run_command, find_bugfixes, linux_info, test_info, find_commits_with_fix_tags
+import dateparser
+import datetime
 
-
-MIN_DATE = "October 1 2016"
-
-
+#MIN_DATE = "October 1 2016"
+MIN_DATE = "November 1 2016"
+MAX_DATE = "November 15 2016"
 
 def get_recent_non_merge_commits():
     args = ["git log  --pretty=oneline --no-color --since='{0}' --no-merges".format(MIN_DATE)]
@@ -12,7 +15,19 @@ def get_recent_non_merge_commits():
     lines = stdout.decode("utf-8").split("\n")
 
     hashes = [l.split(" ")[0] for l in lines if len(l) > 0]
-    return hashes
+
+    commit_objs = []
+    for h in hashes:
+        stdout = run_command("git show --quiet {0} --format='%ad'".format(h))
+
+        lines = stdout.decode("utf-8").split("\n")
+        assert len(lines) == 2
+        assert len(lines[1]) == 0
+        date = lines[0].strip()
+        commit_obj = {'hash': h, 'date': dateparser.parse(date)}
+        commit_objs.append(commit_obj)
+
+    return commit_objs
 
 def find_lines_changed(commit):
     args = "git diff {0}~1 {0} --unified=0 --no-color".format(commit)
@@ -60,11 +75,13 @@ def find_lines_changed(commit):
     return results
 
 
-def get_line_history(commit, filename, start_line, end_line):
+def get_line_history(commit, filename, start_line, end_line, min_date, max_date):
     print("Finding changes for L{1},{2}:{0}".format(filename, start_line, end_line))
-    args = "git log -L{0},{1}:{2} --since='{3}' --no-merges --no-color --pretty=oneline {4}".format(start_line, end_line,
-                                                                                                    filename, MIN_DATE,
-                                                                                                    commit)
+    args = "git log -L{0},{1}:{2} --since='{3}' --before='{4}' --no-merges --no-color --pretty=oneline {5}".format(
+        start_line, end_line,
+        filename,
+        min_date, max_date,
+        commit)
     output = run_command(args)
     lines = output.decode("utf-8").split("\n")
 
@@ -82,34 +99,44 @@ def get_line_history(commit, filename, start_line, end_line):
     return commits
 
 def main():
-    #info = test_info
     info = linux_info
     os.chdir(info["path"])
 
-    bug_fixes = set(find_bugfixes(MIN_DATE))
+    bug_fix_hashes = set(find_commits_with_fix_tags(MIN_DATE))
 
     recent_commits = get_recent_non_merge_commits()
 
     # Ignore first commit
     recent_commits = recent_commits[:-1]
-    overlaps = []
+    overlaps = defaultdict(list)
     for c in recent_commits:
-        print("Looking at commit {0}".format(c))
-        changes = find_lines_changed(c)
+        h = c['hash']
+        # Find other changes to this line a week before
+        min_date = c['date'] - datetime.timedelta(days=7)
+        # Ignore changes to this line on the same day (in case the bug was immediately fixed
+        # or there were just a bunch of commits at once)
+        max_date = c['date'] - datetime.timedelta(days=1)
+        print("Looking at commit {0}".format(h))
+        changes = find_lines_changed(h)
         print("Changes are {0}".format(changes))
         for fname, line_changes in changes.items():
             for (start_line, end_line) in line_changes:
-                commits_list = get_line_history(c, fname, start_line, end_line)
+                commits_list = get_line_history(h, fname, start_line, end_line,
+                                                min_date, max_date)
                 commits = set(commits_list)
-                assert c in commits
-                commits.remove(c)
 
-                if len(bug_fixes & commits) > 0:
-                    print("OVERLAP FOUND")
-                    overlaps.append((c, fname, start_line, end_line, bug_fixes & commits))
+                hash_overlaps = bug_fix_hashes & commits
+                for buggy_commit_hash in hash_overlaps:
+                    overlap_obj = {'fname': fname,
+                                   'start_line': start_line, 'end_line': end_line,
+                                   'fix_commit': c}
+                    print(buggy_commit_hash)
+                    overlaps[buggy_commit_hash].append(overlap_obj)
 
-    print("Overlaps are {0}".format(overlaps))
-    
+                if len(hash_overlaps) > 0:
+                    continue
+
+    pprint.pprint(overlaps)
 
 if __name__ == "__main__":
     main()

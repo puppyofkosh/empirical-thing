@@ -3,35 +3,11 @@ import os
 import re
 from collections import defaultdict
 
-from command_helper import run_command, find_bugfixes, linux_info
-
+from command_helper import run_command, linux_info, find_commits_with_fix_tags
 
 #MIN_DATE = "November 15 2016"
-MIN_DATE = "January 1 2013"
+MIN_DATE = "January 1 2015"
 
-def find_commits_with_fix_tags():
-    args = ["git log --grep 'Fixes: ' --since='{0}' --no-color --no-merges".format(MIN_DATE)]
-    stdout = run_command(args)
-    lines = stdout.decode("utf-8").split("\n")
-    p = re.compile(r'Fixes:\s+(\w+)')
-    commit_regex = re.compile(r'^commit (\w+)$')
-
-    fix_map = defaultdict(set)
-    current_commit = None
-    for l in lines:
-        res = commit_regex.search(l)
-        if res is not None:
-            # Line is telling us which commit we're looking at
-            current_commit = res.group(1)
-            continue
-
-        # Check if the line tell us which commit the current commit fixes
-        res = p.search(l)
-        if res is not None:
-            buggy_commit = res.group(1)
-            fix_map[current_commit].add(buggy_commit)
-
-    return fix_map
 
 def find_broken_fixes(fix_map):
     # Fix map is of form {fix commit -> buggy commit}
@@ -51,7 +27,7 @@ def main():
     info = linux_info
     os.chdir(info["path"])
 
-    fix_map = find_commits_with_fix_tags()
+    fix_map = find_commits_with_fix_tags(MIN_DATE)
     buggy_fixes = find_broken_fixes(fix_map)
 
     print(buggy_fixes)
