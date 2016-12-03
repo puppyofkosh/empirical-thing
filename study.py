@@ -1,12 +1,17 @@
 import pprint
 import os
 from collections import defaultdict
-from command_helper import run_command, find_bugfixes, linux_info, test_info, find_commits_with_fix_tags
+import command_helper
+from command_helper import run_command, try_run_command, find_bugfixes, linux_info, test_info, find_commits_with_fix_tags
 import dateparser
 import datetime
 
-#MIN_DATE = "October 1 2016"
-MIN_DATE = "November 1 2016"
+# line radius 10, 2 weeks, november 1 = 9 bugs
+
+#MIN_DATE = "September 1 2016"
+MIN_DATE = "October 15 2016"
+MIN_DATE_DT = dateparser.parse(MIN_DATE)
+LINE_RADIUS = 20
 
 def get_recent_non_merge_commits():
     args = ["git log --pretty=oneline --no-color --since='{0}' --no-merges".format(MIN_DATE)]
@@ -74,14 +79,18 @@ def find_lines_changed(commit):
     return results
 
 
-def get_line_history(commit, filename, start_line, end_line, min_date, max_date):
-    print("Finding changes for L{1},{2}:{0}".format(filename, start_line, end_line))
+def get_line_history(commit, filename, start_line, end_line, radius, min_date, max_date):
     args = "git log -L{0},{1}:{2} --since='{3}' --pretty=oneline --format='commit:%H|%ad' {4}".format(
-        start_line, end_line,
+        max(start_line - radius, 1), end_line + radius,
         filename,
         MIN_DATE,
         commit)
-    output = run_command(args)
+    output, stderr = try_run_command(args)
+    if len(stderr) > 0 and 'has only' in stderr.decode("utf-8") and radius > 0:
+        return get_line_history(commit, filename, start_line, end_line, 0, min_date, max_date)
+    elif len(stderr) > 0:
+        raise RuntimeError(stderr)
+
     lines = output.decode("utf-8").split("\n")
 
     commits = {}
@@ -103,14 +112,16 @@ def main():
     info = linux_info
     os.chdir(info["path"])
 
-    bug_fix_hashes = set(find_commits_with_fix_tags(MIN_DATE))
+    bug_fix_commits = command_helper.find_commits_with_fix_words(MIN_DATE_DT)
+    bug_fix_hashes = {c['hash'] for c in bug_fix_commits}
+    #bug_fix_hashes = set(find_commits_with_fix_tags(MIN_DATE))
 
-    recent_commits = get_recent_non_merge_commits()
+    print("Found {0} bug fixes".format(len(bug_fix_hashes)))
 
     # Ignore first commit
-    recent_commits = recent_commits[:-1]
+    bug_fix_commits = bug_fix_commits[:-1]
     overlaps = defaultdict(list)
-    for c in recent_commits:
+    for c in bug_fix_commits:
         h = c['hash']
         # Find other changes to this line a week before
         min_date = c['date'] - datetime.timedelta(days=14)
@@ -119,10 +130,9 @@ def main():
         max_date = c['date'] - datetime.timedelta(days=1)
         print("Looking at commit {0}".format(h))
         changes = find_lines_changed(h)
-        print("Changes are {0}".format(changes))
         for fname, line_changes in changes.items():
             for (start_line, end_line) in line_changes:
-                commit_dict = get_line_history(h, fname, start_line, end_line,
+                commit_dict = get_line_history(h, fname, start_line, end_line, LINE_RADIUS,
                                                min_date, max_date)
                 commit_hashes = set(commit_dict.keys())
 
@@ -130,7 +140,6 @@ def main():
                 for buggy_commit_hash in hash_overlaps:
                     overlap_obj = {'path': '{0},{1}:{2}'.format(start_line, end_line, fname),
                                    'fix_commit': c}
-                    print(buggy_commit_hash)
                     key = (buggy_commit_hash, commit_dict[buggy_commit_hash])
                     overlaps[key].append(overlap_obj)
 
@@ -139,6 +148,7 @@ def main():
 
     pprint.pprint(overlaps)
     print("Total number of fixes since {0}:{1}".format(MIN_DATE, len(bug_fix_hashes)))
+    print("Number of buggy fixes found: {0}".format(len(overlaps)))
 
 if __name__ == "__main__":
     main()
