@@ -38,10 +38,8 @@ def find_bugfixes(min_date):
     hashes = [l.split(" ")[0] for l in lines if len(l) > 0]
     return hashes
 
-def find_commits_with_fix_tags(min_date, max_date=None):
+def find_commits_with_fix_tags(min_date):
     argstr = "git log --grep 'Fixes: ' --since='{0}' --no-color --no-merges".format(min_date)
-    if max_date is not None:
-        argstr += " --before='{0}'".format(max_date)
     args = [argstr]
     stdout = run_command(args)
     lines = stdout.decode("utf-8").split("\n")
@@ -65,7 +63,7 @@ def find_commits_with_fix_tags(min_date, max_date=None):
 
     return fix_map
 
-def find_commits_with_fix_words(min_date):
+def find_commits_with_fix_words(min_date, max_date=None):
     args = [r"git log --grep='Reported-and-tested\|Fixes:\|Fix\|fix\|bug\|Acked-by' --pretty=oneline --format='commit:%H|%ad' --since='{0}' --no-merges".format(min_date)]
     stdout = run_command(args)
     lines = stdout.decode("utf-8").split("\n")
@@ -77,7 +75,7 @@ def find_commits_with_fix_words(min_date):
             continue
         commit = l[l.find(":")+1:l.find("|")]
         date = dateparser.parse(l[l.find("|")+1:])
-        if date >= min_date:
+        if date >= min_date and (max_date is None or date <= max_date):
             ob = {'hash': commit, 'date': date}
             commits.append(ob)
 

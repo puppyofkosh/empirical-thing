@@ -12,7 +12,7 @@ from command_helper import run_command, linux_info, find_commits_with_fix_tags,g
 #MIN_DATE = "November 15 2016"
 #MIN_DATE = "January 1 2015"
 
-MIN_DATE = "January 1 2014"
+MIN_DATE = "October 1 2016"
 #MIN_DATE = "September 1 2016"
 
 def find_broken_fixes(fix_map):

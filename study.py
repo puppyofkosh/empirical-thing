@@ -9,8 +9,12 @@ import datetime
 # line radius 10, 2 weeks, november 1 = 9 bugs
 
 #MIN_DATE = "September 1 2016"
-MIN_DATE = "October 15 2016"
+MIN_DATE = "October 1 2016"
 MIN_DATE_DT = dateparser.parse(MIN_DATE)
+
+MAX_DATE = "January 1 2017"
+MAX_DATE_DT = dateparser.parse(MAX_DATE)
+
 LINE_RADIUS = 20
 
 def get_recent_non_merge_commits():
@@ -34,7 +38,7 @@ def get_recent_non_merge_commits():
     return commit_objs
 
 def find_lines_changed(commit):
-    args = "git diff {0}~1 {0} --unified=0 --no-color".format(commit)
+    args = "git show {0} --unified=0 --no-color --pretty=oneline --format=''".format(commit)
     output = run_command(args)
     lines = output.decode("utf-8").split("\n")
     DELIM = "@@"
@@ -112,7 +116,7 @@ def main():
     info = linux_info
     os.chdir(info["path"])
 
-    bug_fix_commits = command_helper.find_commits_with_fix_words(MIN_DATE_DT)
+    bug_fix_commits = command_helper.find_commits_with_fix_words(MIN_DATE_DT, MAX_DATE_DT)
     bug_fix_hashes = {c['hash'] for c in bug_fix_commits}
     #bug_fix_hashes = set(find_commits_with_fix_tags(MIN_DATE))
 
@@ -132,6 +136,7 @@ def main():
         changes = find_lines_changed(h)
         for fname, line_changes in changes.items():
             for (start_line, end_line) in line_changes:
+                print("Getting line history")
                 commit_dict = get_line_history(h, fname, start_line, end_line, LINE_RADIUS,
                                                min_date, max_date)
                 commit_hashes = set(commit_dict.keys())
